@@ -3,7 +3,17 @@ This tutorial uses QEMU stable-10.0
 ## Prerequisites
 - Like 40GB of free space 
 - Ubuntu 22.04 (jammy)
-- Big script (I was too lazy to narrow it down to what is actually needed so some may be extra):
+
+## If you can't be bothered
+
+There is the script full-setup.sh that does the code for you until the **Boot VM with the .iso file** so after you clone the repo you can just:
+```
+chmod +x full-setup.sh
+./full-setup.sh
+```
+and then go to the **Boot VM with the .iso file** and continue.
+
+## Ignore this for now
 
 ```
 sudo apt-get install -y libglib2.0-dev libgcrypt20-dev zlib1g-dev autoconf automake libtool flex libpixman-1-dev bc make ninja-build libncurses-dev libelf-dev libssl-dev libcap-ng-dev libattr1-dev libslirp-dev libslirp0 git fakeroot build-essential ncurses-dev xz-utils libssl-dev bc libelf-dev bison python3-venv python3-pip
@@ -22,7 +32,7 @@ git checkout dcd-v6-2025-09-23
 make menuconfig
 ```
 
-do menuconfig
+Do menuconfig
 ```
 make -j$(nproc)  
 cd ../  
@@ -30,9 +40,11 @@ wget https://releases.ubuntu.com/plucky/ubuntu-25.04-live-server-amd64.iso
 qemu/build/qemu-img create -f qcow2 ubuntu25.04.qcow2 30G
 ```
 
+# If you wanna go step by step
+
 ## Packages
 ```
-sudo apt-get install python3-venv python3-pip ninja-build libglib2.0-dev flex bison libncurses-dev libelf-dev libssl-dev libslirp-dev libslirp0
+sudo apt-get install -y libglib2.0-dev libgcrypt20-dev zlib1g-dev autoconf automake libtool flex libpixman-1-dev bc make ninja-build libncurses-dev libelf-dev libssl-dev libcap-ng-dev libattr1-dev libslirp-dev libslirp0 git fakeroot build-essential ncurses-dev xz-utils bison python3-venv python3-pip
 ```
 #### The following will not work properly in Ubuntu 25.04 (so make sure you use 22.04)!
 ```
@@ -64,15 +76,8 @@ cd ../
 git clone https://github.com/weiny2/linux-kernel.git
 cd linux-kernel
 git checkout dcd-v6-2025-09-23
+make defconfig
 ```
-
-Now this part will be scary if you've never done it, be not afraid:
-```
-make menuconfig 
-```
-
-A white menu will come up, press the right arrow to get to \<Save> and press Enter, then to \<Ok> and press Enter, then to \<Exit> and press Enter again. Then go to \<Exit> and press Enter.
-
 A .config file should have appeared now, delete it and add my .config file to this directory
 ```
 ls -lh .config
@@ -154,7 +159,10 @@ Your terminal should now not take any input after this script. Open your VNC pro
 
 Now the .iso file did it's job and is no longer needed, you will boot with the disk now. You can delete the .iso file if you want.
 
-#### If you have a GUI
+We are done here, now it's just a matter of setting up your QEMU VM CXL configuration how you want it, the following are some examples (the exact commands are run in the cxl-qemu folder).
+
+### Barebones VM
+##### If you have a GUI
 ```
 ./qemu/build/qemu-system-x86_64 \
 -m 8192 \
@@ -164,7 +172,7 @@ Now the .iso file did it's job and is no longer needed, you will boot with the d
 -drive file=ubuntu25.04.qcow2,format=qcow2
 ```
 
-#### If don't have a GUI, you're gonna have to still use VNC software like before to run the VM (or check out the -nographic flag, for me it didn't work on my server)
+##### If don't have a GUI, you're gonna have to still use VNC software like before to run the VM (or check out the -nographic flag, for me it didn't work on my server)
 ```
 ./qemu/build/qemu-system-x86_64 \
 -m 8192 \
@@ -174,3 +182,4 @@ Now the .iso file did it's job and is no longer needed, you will boot with the d
 -drive file=ubuntu25.04.qcow2,format=qcow2 \
 -vnc 0.0.0.0:0
 ```
+
