@@ -23,11 +23,12 @@ make menuconfig
 ```
 
 do menuconfig
-
-> make -j$(nproc)  
-> cd ../  
-> wget https://releases.ubuntu.com/plucky/ubuntu-25.04-live-server-amd64.iso  
-> qemu/build/qemu-img create -f qcow2 ubuntu25.04.qcow2 30G
+```
+make -j$(nproc)  
+cd ../  
+wget https://releases.ubuntu.com/plucky/ubuntu-25.04-live-server-amd64.iso  
+qemu/build/qemu-img create -f qcow2 ubuntu25.04.qcow2 30G
+```
 
 ## Packages
 ```
