@@ -1,5 +1,8 @@
 # Emulating CXL with QEMU Tutorial
-This tutorial uses QEMU stable-10.0
+This is a step by step tutorial on how to set up QEMU from the source code, compile a linux kernel with custom configurations and use it with QEMU to boot up an Ubuntu 25.04 Virtual Machine with CXL devices for emulation.
+
+**Notice:** Before we get started, if you are in any organizational machine (e.g. University server) that has safety measures such as proxy servers, blocking iptables and such, just give up. I tried to do this on an organizational machine and almost pulled my hair out, ask your organization for a laptop or access to server providers like CloudLab.
+
 ## Prerequisites
 - Like 40GB of free space 
 - Ubuntu 22.04 (jammy)
@@ -84,9 +87,11 @@ ls -lh .config
 rm .config
 ```
 
-Now run the next command and go find something else to do because it may take a while. (it may ask you some questions at the start, press y)
+Now run the next commands and go find something else to do because it may take a while. (it may ask you some questions at the start, press y)
 ```
 make -j$(nproc)
+sudo make modules_install
+sudo mkinitramfs -o ~/cxl-qemu/initrd.img 6.17.0-rc6+
 ```
 
 To verify that it finished successfully you should have a bzImage file
@@ -116,6 +121,7 @@ Now in your directory cxl-qemu (if you named it the same) you should have:
 - a folder "qemu"
 - a file ubuntu-25.04-live-server-amd64.iso
 - a file ubuntu25.04.qcow2
+- a file initrd.img
 
 ## Boot VM with the .iso file
 
@@ -161,25 +167,73 @@ Now the .iso file did it's job and is no longer needed, you will boot with the d
 
 We are done here, now it's just a matter of setting up your QEMU VM CXL configuration how you want it, the following are some examples (the exact commands are run in the cxl-qemu folder).
 
-### Barebones VM
-##### If you have a GUI
+### VM with CXL Devices
+Make a bash script to launch your VM and change the various paths and then just run it.
 ```
-./qemu/build/qemu-system-x86_64 \
--m 8192 \
--smp 4 \
--machine type=q35 \
--boot c \
--drive file=ubuntu25.04.qcow2,format=qcow2
-```
+#!/bin/bash
 
-##### If don't have a GUI, you're gonna have to still use VNC software like before to run the VM (or check out the -nographic flag, for me it didn't work on my server)
+# Paths
+KERNEL="$HOME/cxl-qemu/linux-kernel/arch/x86_64/boot/bzImage"
+DISK="$HOME/cxl-qemu/ubuntu25.04.qcow2"
+CXL_MEM="/tmp/cxltest.raw"
+CXL_LSA="/tmp/lsa.raw"
+
+# QEMU command
+$HOME/cxl-qemu/qemu/build/qemu-system-x86_64 \
+  -M q35,cxl=on -m 4G,maxmem=8G,slots=8 -smp 4 \
+  -kernel "$KERNEL" \
+  -append "root=/dev/mapper/ubuntu--vg-ubuntu--lv console=ttyS0 rw" \
+  -drive file="$DISK",format=qcow2,if=none,id=hd0 \
+  -device virtio-blk-pci,drive=hd0,bus=pcie.0,id=virtio0 \
+  -initrd ~/cxl-qemu/initrd.img \
+  \
+  -netdev user,id=net0 \
+  -device virtio-net-pci,netdev=net0 \
+  \
+  -nographic \
+  \
+  -object memory-backend-file,id=cxl-mem1,share=on,mem-path="$CXL_MEM",size=256M \
+  -object memory-backend-file,id=cxl-lsa1,share=on,mem-path="$CXL_LSA",size=256M \
+  -device pxb-cxl,bus_nr=12,bus=pcie.0,id=cxl.1 \
+  -device cxl-rp,port=0,bus=cxl.1,id=root_port13,chassis=0,slot=2 \
+  -device cxl-type3,bus=root_port13,persistent-memdev=cxl-mem1,lsa=cxl-lsa1,id=cxl-pmem0,sn=0x1 \
+  -M cxl-fmw.0.targets.0=cxl.1,cxl-fmw.0.size=4G
+
 ```
-./qemu/build/qemu-system-x86_64 \
--m 8192 \
--smp 4 \
--machine type=q35 \
--boot c \
--drive file=ubuntu25.04.qcow2,format=qcow2 \
--vnc 0.0.0.0:0
+# Warning: Nothing is guaranteed from this point on QEMU VMs is a very complicated topic that I don't know enough on, I will write some errors/things I encountered and what I did
+## I can't sudo apt / VM doesn't have internet access
+
+In the VM if you try to `ping 8.8.8.8` and it says Network is Unreachable do this:
+```
+ip addr
+```
+You should see something like:
+```
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host noprefixroute 
+       valid_lft forever preferred_lft forever
+2: enp0s3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state DOWN group default qlen 1000
+    link/ether 52:54:00:12:34:56 brd ff:ff:ff:ff:ff:ff
+    altname enx525400123456
+```
+Copy the name `enp0s3` or whatever yours is. Now make sure you have a .yaml file in your `/etc/netplan/`
+```
+.........:~$ ls /etc/netplan
+50-cloud-init.yaml
+```
+Edit it now so that it's contents are the following, change `enp0s3` to whatever yours is.
+```
+network:
+  version: 2
+  ethernets:
+    enp0s3:
+      dhcp4: true
+```
+Then apply the changes and try to `ping 8.8.8.8` again.
+```
+sudo netplan apply
 ```
 
