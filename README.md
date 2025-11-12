@@ -66,7 +66,8 @@ Now run the next commands and go find something else to do because it may take a
 ```
 make -j$(nproc)
 sudo make modules_install
-sudo mkinitramfs -o ~/cxl-qemu/initrd.img 6.17.0-rc6+
+cd ../
+sudo mkinitramfs -o initrd.img $(cat linux-kernel/include/config/kernel.release)
 ```
 
 To verify that it finished successfully you should have a bzImage file
@@ -211,4 +212,3 @@ Then apply the changes and try to `ping 8.8.8.8` again.
 ```
 sudo netplan apply
 ```
-
