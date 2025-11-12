@@ -16,7 +16,7 @@ cd linux-kernel
 git checkout dcd-v6-2025-09-23
 make defconfig
 rm .config
-mv ../.config .config
+mv ../../.config .config
 make -j$(nproc)
 sudo make modules_install
 sudo mkinitramfs -o initrd.img 6.17.0-rc+
