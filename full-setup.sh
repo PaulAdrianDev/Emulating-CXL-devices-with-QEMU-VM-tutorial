@@ -20,7 +20,7 @@ mv ../../.config .config
 make -j$(nproc)
 sudo make modules_install
 cd ../
-sudo mkinitramfs -o initrd.img 6.17.0-rc+ 
+sudo mkinitramfs -o initrd.img $(cat linux-kernel/include/config/kernel.release) 
 wget https://releases.ubuntu.com/plucky/ubuntu-25.04-live-server-amd64.iso  
 qemu/build/qemu-img create -f qcow2 ubuntu25.04.qcow2 30G
 
