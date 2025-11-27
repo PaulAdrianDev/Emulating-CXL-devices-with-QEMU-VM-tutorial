@@ -1,3 +1,4 @@
+
 # Emulating CXL with QEMU Tutorial
 This is a step by step tutorial on how to set up QEMU from the source code, compile a linux kernel with custom configurations and use it with QEMU to boot up an Ubuntu 25.04 Virtual Machine with CXL devices for emulation.
 
@@ -159,7 +160,7 @@ Your terminal should now not take any input after this script. Open your VNC pro
 
 ## Boot VM with the disk now
 
-Now the .iso file did it's job and is no longer needed, you will boot with the disk now. You can delete the .iso file if you want.
+Now the .iso file did it's job and is no longer needed, you will boot with the disk now. You can delete the .iso file if you want. You can also delete all the linux-kernel content but **keep the bzImage**.
 
 We are done here, now it's just a matter of setting up your QEMU VM CXL configuration how you want it, the following are some examples. You can check out some example VMs on [QEMU's CXL Page](https://www.qemu.org/docs/master/system/devices/cxl.html).
 
@@ -252,3 +253,49 @@ Then apply the changes and try to `ping 8.8.8.8` again.
 ```
 sudo netplan apply
 ```
+
+## Install the modules of your custom kernel
+Now the VM that booted has the built-in features of your custom kernel. If you want to have the modules of your custom kernel in your VM also, you need to compile the same linux image in the VM. (I don't know if this is needed but I did it just in case some program needs modules or stuff)
+
+***If you'll do this, you will need more storage than 30GB, I made my VM 100GB just incase but the whole process took around 50GB of storage at its peak. So resize your image (on the host) to atleast 60GB and resize the disk in the VM to take up this new space. Also I suggest you open your VM with more than 4 cores and more RAM to finish fast.***
+
+#### In the VM:
+You'll need the same .config file
+```
+mkdir more-setup
+cd more-setup
+git clone https://github.com/PaulAdrianDev/Emulating-CXL-devices-with-QEMU-VM-tutorial.git
+```
+
+Now you do the same linux process
+```
+git clone https://github.com/weiny2/linux-kernel.git
+cd linux-kernel
+git checkout dcd-v6-2025-09-23
+make menuconfig
+```
+Just press \<Exit> on menuconfig.
+
+The following will install the modules that the custom .config file has, as well as other linux-y things for your kernel that might or might not be useful
+```
+rm .config
+cp ../Emulating-CXL-devices-with-QEMU-VM-tutorial/.config .config
+make -j$(nproc)
+sudo make modules_install
+sudo update-initramfs -c -k 6.17.0-rc6+
+sudo make install
+```
+
+And then reboot
+```
+sudo reboot
+```
+
+And now you should see your kernel's `(6.17.0-rc6+)` modules:
+```
+...........:~$ ls /lib/modules
+6.14.0-15-generic  6.14.0-35-generic  6.14.0-36-generic  6.17.0-rc6+
+```
+
+Now you can delete the more-setup dir and have fun CXL-ing!
+
