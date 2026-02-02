@@ -164,51 +164,39 @@ Now the .iso file did it's job and is no longer needed, you will boot with the d
 
 We are done here, now it's just a matter of setting up your QEMU VM CXL configuration how you want it, the following are some examples. You can check out some example VMs on [QEMU's CXL Page](https://www.qemu.org/docs/master/system/devices/cxl.html).
 
-### This is a launch command from the QEMU docs.
-I suggest you make a script to store your QEMU launch commands because you can easily copy it and try changing things.
+### This is a launch command for 1 Volatile Device
+I suggest you make a script to store your QEMU launch commands because you can easily copy it and try changing things. I used this one.
 ```
 #!/bin/bash
 
 # Paths
-KERNEL="$HOME/Emulating-CXL-devices-with-QEMU-VM-tutorial/cxl-qemu/linux-kernel/arch/x86_64/boot/bzImage"
-DISK="$HOME/Emulating-CXL-devices-with-QEMU-VM-tutorial/cxl-qemu/ubuntu25.04.qcow2"
-INITRD="$HOME/Emulating-CXL-devices-with-QEMU-VM-tutorial/cxl-qemu/initrd.img"
-QEMU="$HOME/Emulating-CXL-devices-with-QEMU-VM-tutorial/cxl-qemu/qemu/build/qemu-system-x86_64"
+PATH_TO_CXL_TUTORIAL="/mydata"
+KERNEL="$PATH_TO_CXL_TUTORIAL/Emulating-CXL-devices-with-QEMU-VM-tutorial/cxl-qemu/linux-kernel/arch/x86_64/boot/bzImage"
+DISK="$PATH_TO_CXL_TUTORIAL/Emulating-CXL-devices-with-QEMU-VM-tutorial/cxl-qemu/ubuntu25.04.qcow2"
+INITRD="$PATH_TO_CXL_TUTORIAL/Emulating-CXL-devices-with-QEMU-VM-tutorial/cxl-qemu/initrd.img"
+QEMU="$PATH_TO_CXL_TUTORIAL/Emulating-CXL-devices-with-QEMU-VM-tutorial/cxl-qemu/qemu/build/qemu-system-x86_64"
 
-# Launch QEMU VM
 sudo $QEMU \
-  -M q35,cxl=on \
-  -smp 4 \
-  -m 4G,maxmem=8G,slots=8 \
+  -machine type=q35,cxl=on,accel=kvm,mem-merge=on \
+  -smp 32 \
+  -m 8G,maxmem=16G,slots=8 \
+  -cpu host \
   -kernel "$KERNEL" \
-  -append "root=/dev/mapper/ubuntu--vg-ubuntu--lv console=ttyS0 rw" \
   -initrd "$INITRD" \
+  -append "root=/dev/mapper/ubuntu--vg-ubuntu--lv console=ttyS0 rw memhp_default_state=online_movable" \
   -drive file="$DISK",format=qcow2,if=none,id=hd0 \
   -device virtio-blk-pci,drive=hd0,bus=pcie.0,id=virtio0 \
   -netdev user,id=net0 \
   -device virtio-net-pci,netdev=net0 \
   -nographic \
-  -accel kvm \
   \
-  -object memory-backend-file,id=cxl-mem1,share=on,mem-path=/tmp/cxltest.raw,size=256M \
-  -object memory-backend-file,id=cxl-mem2,share=on,mem-path=/tmp/cxltest2.raw,size=256M \
-  -object memory-backend-file,id=cxl-mem3,share=on,mem-path=/tmp/cxltest3.raw,size=256M \
-  -object memory-backend-file,id=cxl-mem4,share=on,mem-path=/tmp/cxltest4.raw,size=256M \
-  -object memory-backend-file,id=cxl-lsa1,share=on,mem-path=/tmp/lsa.raw,size=256M \
-  -object memory-backend-file,id=cxl-lsa2,share=on,mem-path=/tmp/lsa2.raw,size=256M \
-  -object memory-backend-file,id=cxl-lsa3,share=on,mem-path=/tmp/lsa3.raw,size=256M \
-  -object memory-backend-file,id=cxl-lsa4,share=on,mem-path=/tmp/lsa4.raw,size=256M \
+  -object memory-backend-ram,id=vmem0,share=on,size=256M \
+  -object memory-backend-ram,id=vmem1,share=on,size=512M \
   -device pxb-cxl,bus_nr=12,bus=pcie.0,id=cxl.1 \
-  -device pxb-cxl,bus_nr=222,bus=pcie.0,id=cxl.2 \
   -device cxl-rp,port=0,bus=cxl.1,id=root_port13,chassis=0,slot=2 \
-  -device cxl-type3,bus=root_port13,persistent-memdev=cxl-mem1,lsa=cxl-lsa1,id=cxl-pmem0,sn=0x1 \
   -device cxl-rp,port=1,bus=cxl.1,id=root_port14,chassis=0,slot=3 \
-  -device cxl-type3,bus=root_port14,persistent-memdev=cxl-mem2,lsa=cxl-lsa2,id=cxl-pmem1,sn=0x2 \
-  -device cxl-rp,port=0,bus=cxl.2,id=root_port15,chassis=0,slot=5 \
-  -device cxl-type3,bus=root_port15,persistent-memdev=cxl-mem3,lsa=cxl-lsa3,id=cxl-pmem2,sn=0x3 \
-  -device cxl-rp,port=1,bus=cxl.2,id=root_port16,chassis=0,slot=6 \
-  -device cxl-type3,bus=root_port16,persistent-memdev=cxl-mem4,lsa=cxl-lsa4,id=cxl-pmem3,sn=0x4 \
-  -M cxl-fmw.0.targets.0=cxl.1,cxl-fmw.0.targets.1=cxl.2,cxl-fmw.0.size=4G,cxl-fmw.0.interleave-granularity=8k
+  -device cxl-type3,bus=root_port13,volatile-memdev=vmem0,id=cxl-vmem0 \
+  -M cxl-fmw.0.targets.0=cxl.1,cxl-fmw.0.size=4G,cxl-fmw.0.interleave-granularity=4k
 
 ```
 # Things to do when you open your VM
@@ -254,7 +242,92 @@ Then apply the changes and try to `ping 8.8.8.8` again.
 sudo netplan apply
 ```
 
-## Install the modules of your custom kernel
+## Create CXL Memory Region
+To see the difference, you should NOT have a region0 in your CXL devices.
+```
+.......:~$ ls /sys/bus/cxl/devices/
+
+decoder0.0  decoder1.2	decoder2.1  endpoint2	    port1
+decoder1.0  decoder1.3	decoder2.2  mem0	    root0
+decoder1.1  decoder2.0	decoder2.3  nvdimm-bridge0
+```
+
+If you ran the launch command like above you should run
+```
+sudo cxl create-region -m -d decoder0.0 -w 1 -g 4096 -t ram mem0
+```
+
+Now you should get a JSON output if it worked correctly and it will appear in this folder:
+```
+.......:~$ ls /sys/bus/cxl/devices/
+
+dax_region0  decoder1.1  decoder2.0  decoder2.3  nvdimm-bridge0  root0
+decoder0.0   decoder1.2  decoder2.1  endpoint2	 port1
+decoder1.0   decoder1.3  decoder2.2  mem0	 region0
+```
+
+Also after a successful command you should get a file here
+```
+........:~$ ls -lh /dev/dax0.0
+
+crw------- 1 root root 249, 1 Feb  2 09:43 /dev/dax0.0
+```
+
+Do also:
+```
+daxctl list
+```
+You should get an output like this:
+```
+[
+  {
+    "chardev":"dax0.0",
+    "size":268435456,
+    "target_node":1,
+    "align":2097152,
+    "mode":"system-ram"
+  }
+]
+```
+
+If it says `"mode":"devdax"` or has `"state":"disabled"` check that your DAX modules are built-in:
+```
+.........:~$ zcat /proc/config.gz | grep -i dax
+
+CONFIG_ARCH_WANT_OPTIMIZE_DAX_VMEMMAP=y
+CONFIG_NVDIMM_DAX=y
+CONFIG_DAX=y
+CONFIG_DEV_DAX=y
+CONFIG_DEV_DAX_PMEM=y
+CONFIG_DEV_DAX_HMEM=y
+CONFIG_DEV_DAX_CXL=y
+CONFIG_DEV_DAX_HMEM_DEVICES=y
+CONFIG_DEV_DAX_KMEM=y
+CONFIG_FS_DAX=y
+CONFIG_FS_DAX_PMD=y
+CONFIG_FUSE_DAX=y
+```
+
+At first I had issues with this DAX but I just forgot to enable 1 module (DAX_KMEM), as soon as I enabled it and rebuilt it worked perfectly.
+
+Now you should see that the device shows up as a NUMA node:
+```
+.......:~$ numactl --hardware
+
+available: 2 nodes (0-1)
+node 0 cpus: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+node 0 size: 7942 MB
+node 0 free: 6690 MB
+node 1 cpus:
+node 1 size: 256 MB
+node 1 free: 256 MB
+node distances:
+node   0   1 
+  0:  10  20 
+  1:  20  10 
+```
+
+## Install the modules of your custom kernel (NOT really needed)
 Now the VM that booted has the built-in features of your custom kernel. If you want to have the modules of your custom kernel in your VM also, you need to compile the same linux image in the VM. (I don't know if this is needed but I did it just in case some program needs modules or stuff)
 
 ***If you'll do this, you will need more storage than 30GB, I made my VM 100GB just incase but the whole process took around 50GB of storage at its peak. So resize your image (on the host) to atleast 60GB and resize the disk in the VM to take up this new space. Also I suggest you open your VM with more than 4 cores and more RAM to finish fast.***
